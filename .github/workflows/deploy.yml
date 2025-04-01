@@ -13,10 +13,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
+      uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -29,9 +29,7 @@ jobs:
         echo "TF_VAR_root_db_password=${{ secrets.ROOT_DB_PASSWORD }}" >> $GITHUB_ENV
 
     - name: Set up Terraform
-      uses: hashicorp/setup-terraform@v1
-      with:
-        terraform_version: 1.0.0
+      uses: hashicorp/setup-terraform@v3
 
     - name: Terraform Init
       run: terraform init
