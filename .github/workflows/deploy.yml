@@ -23,10 +23,10 @@ jobs:
         aws-region: ca-central-1
 
     - name: Set environment variables
-        run: |
-          echo "TF_VAR_service_name=${{ github.event.repository.name  }}" >> $GITHUB_ENV
-          echo "TF_VAR_root_db_username=${{ secrets.ROOT_DB_USERNAME }}" >> $GITHUB_ENV
-          echo "TF_VAR_root_db_password=${{ secrets.ROOT_DB_PASSWORD }}" >> $GITHUB_ENV
+      run: |
+        echo "TF_VAR_service_name=${{ github.event.repository.name }}" >> $GITHUB_ENV
+        echo "TF_VAR_root_db_username=${{ secrets.ROOT_DB_USERNAME }}" >> $GITHUB_ENV
+        echo "TF_VAR_root_db_password=${{ secrets.ROOT_DB_PASSWORD }}" >> $GITHUB_ENV
 
     - name: Set up Terraform
       uses: hashicorp/setup-terraform@v1
