@@ -28,6 +28,7 @@ resource "aws_db_subnet_group" "default" {
 }
 
 resource "aws_db_instance" "default" {
+  name                 = "lifetracker"
   allocated_storage    = 20
   engine               = "mysql"
   engine_version       = "8.0"
