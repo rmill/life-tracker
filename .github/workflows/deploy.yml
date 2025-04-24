@@ -33,14 +33,14 @@ jobs:
       env:
         TF_VAR_root_db_username: ${{ secrets.ROOT_DB_USERNAME }}
         TF_VAR_root_db_password: ${{ secrets.ROOT_DB_PASSWORD }}
-        TF_VAR_service_name: ${{ github.repository }}
+        TF_VAR_service_name: life-tracker
       run: terraform plan
 
     - name: Terraform Apply
       env:
         TF_VAR_root_db_username: ${{ secrets.ROOT_DB_USERNAME }}
         TF_VAR_root_db_password: ${{ secrets.ROOT_DB_PASSWORD }}
-        TF_VAR_service_name: ${{ github.repository }}
+        TF_VAR_service_name: life-tracker
       run: terraform apply -auto-approve
 
     - name: Upload Terraform state file
