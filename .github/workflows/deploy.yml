@@ -30,6 +30,10 @@ jobs:
       run: terraform init
 
     - name: Terraform Plan
+      env:
+        TF_VAR_root_db_username: ${{ secrets.ROOT_DB_USERNAME }}
+        TF_VAR_root_db_password: ${{ secrets.ROOT_DB_PASSWORD }}
+        TF_VAR_service_name: ${{ github.repository }}
       run: terraform plan
 
     - name: Terraform Apply
