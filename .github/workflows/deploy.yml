@@ -22,12 +22,6 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ca-central-1
 
-    - name: Set environment variables
-      run: |
-        echo "TF_VAR_service_name=${{ github.event.repository.name }}" >> $GITHUB_ENV
-        echo "TF_VAR_root_db_username=${{ secrets.ROOT_DB_USERNAME }}" >> $GITHUB_ENV
-        echo "TF_VAR_root_db_password=${{ secrets.ROOT_DB_PASSWORD }}" >> $GITHUB_ENV
-
     - name: Set up Terraform
       uses: hashicorp/setup-terraform@v3
 
@@ -38,6 +32,10 @@ jobs:
       run: terraform plan
 
     - name: Terraform Apply
+      env:
+        TF_VAR_root_db_username: ${{ secrets.ROOT_DB_USERNAME }}
+        TF_VAR_root_db_password: ${{ secrets.ROOT_DB_PASSWORD }}
+        TF_VAR_service_name: ${{ github.repository }}
       run: terraform apply -auto-approve
 
     - name: Upload Terraform state file
