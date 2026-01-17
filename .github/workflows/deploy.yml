@@ -96,7 +96,7 @@ jobs:
       - name: Run external API tests
         env:
           SKIP_LIVE_API_TESTS: false
-          TEST_USER_ID: test-user
+          TEST_USER_ID: zerocool
           AUTO_GENERATE_OAUTH: false
         run: |
           pytest tests/test_external_api.py -v
