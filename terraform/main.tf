@@ -144,6 +144,20 @@ data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = "${path.module}/../src"
   output_path = "${path.module}/lambda_function.zip"
+  excludes    = ["__pycache__", "*.pyc", ".pytest_cache"]
+}
+
+resource "null_resource" "install_dependencies" {
+  triggers = {
+    requirements = filemd5("${path.module}/../requirements-lambda.txt")
+  }
+
+  provisioner "local-exec" {
+    command = <<EOF
+      cd ${path.module}/..
+      pip install -r requirements-lambda.txt -t src/ --upgrade
+    EOF
+  }
 }
 
 resource "aws_lambda_function" "metrics_collector" {
@@ -172,7 +186,8 @@ resource "aws_lambda_function" "metrics_collector" {
 
   depends_on = [
     aws_cloudwatch_log_group.lambda_logs,
-    aws_iam_role_policy.lambda_policy
+    aws_iam_role_policy.lambda_policy,
+    null_resource.install_dependencies
   ]
 }
 
