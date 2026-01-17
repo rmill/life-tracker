@@ -50,7 +50,7 @@ def test_google_fit_credentials_configured(ssm_client):
         assert len(client_secret['Parameter']['Value']) > 0
         
     except ClientError as e:
-        pytest.skip(f"Google Fit credentials not configured in SSM: {e}")
+        pytest.fail(f"Google Fit credentials not configured in SSM: {e}")
 
 
 def test_google_fit_integration_instantiation(google_fit_credentials_exist):
@@ -124,16 +124,13 @@ def test_integration_registry_has_google_fit():
     
     assert 'steps' in metrics
     
-    # Should be able to get the integration class (may fail on instantiation without credentials)
+    # Should be able to get the integration class
     try:
         integration = registry.get_integration('steps', 'test-user')
         assert integration.__class__.__name__ == 'GoogleFitStepsIntegration'
     except Exception as e:
-        # Expected if SSM credentials not available
-        if 'ParameterNotFound' in str(e) or 'Parameter' in str(e):
-            pytest.skip(f"Google Fit credentials not configured: {e}")
-        else:
-            raise
+        # Fail if credentials are missing - this is required for the app to work
+        pytest.fail(f"Cannot instantiate Google Fit integration: {e}")
 
 
 def test_google_fit_api_scopes():
