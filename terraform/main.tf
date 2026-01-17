@@ -169,7 +169,7 @@ resource "aws_lambda_function" "metrics_collector" {
   function_name    = var.project_name
   role            = aws_iam_role.lambda_role.arn
   handler         = "lambda_function.handler"
-  source_code_hash = filebase64sha256("${path.module}/lambda_function.zip")
+  source_code_hash = null_resource.lambda_package.id
   runtime         = "python3.11"
   timeout         = 300
   memory_size     = 256
