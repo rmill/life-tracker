@@ -1,0 +1,29 @@
+ARCHITECTURE DESIGN
+
+- Lambda to run integrations
+- Written in python
+- Can run all integrations or just a single one (allows for horizontal scaling)
+- Integrates with external API
+- Know when the last run was so it can fill in all data between then and now
+- Integrations hidden behind the metric we are gathering
+-- This allows for multiple integrations for the same metric
+- Should be idempotent
+- Store in a database in an easily graphed way
+- Configuration/API keys to be stored as secrets in param store
+- Lambda triggered every 24 hours
+- Logs in CloudWatch
+-- should be very detailed
+- Terraform used to deploy infrastructure
+- GitHub used for version control
+-- Create a new one if doesn't exist
+- GitHub Actions pipeline to deploy
+
+DATA
+- Need to determine database technology
+- Don't see the need for a relational database
+- Granularity of metrics can be daily
+- Allow for metrics for multiple users
+
+FEATURES
+- every 24 hours the all metrics lambda is run and will fetch the number of steps from Google fit for all users and store them in the DB. IF it is the first run, fetch the previous week's data (if possible).
+- Stores runs so that future runs can know how much data to fetch
