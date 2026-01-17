@@ -6,6 +6,12 @@ terraform {
       version = "~> 5.0"
     }
   }
+  
+  backend "s3" {
+    bucket = "life-stats-terraform-state"
+    key    = "terraform.tfstate"
+    region = "us-west-2"
+  }
 }
 
 provider "aws" {
