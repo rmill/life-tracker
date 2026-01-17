@@ -178,8 +178,34 @@ echo -e "${GREEN}GitHub Repo:${NC} ${GITHUB_REPO}"
 echo -e "${GREEN}IAM Role ARN:${NC} ${ROLE_ARN}"
 
 echo -e "\n${YELLOW}Next steps:${NC}"
-echo "1. Add this secret to your GitHub repository:"
-echo -e "   ${GREEN}AWS_ROLE_ARN${NC} = ${ROLE_ARN}"
+echo "1. Add AWS_ROLE_ARN secret to GitHub repository"
+echo ""
+
+# Try to add GitHub secret automatically
+read -p "Do you want to add the AWS_ROLE_ARN secret to GitHub now? (y/n) [y]: " ADD_SECRET
+ADD_SECRET=${ADD_SECRET:-y}
+
+if [ "$ADD_SECRET" = "y" ]; then
+    if command -v gh >/dev/null 2>&1; then
+        echo -e "\n${YELLOW}Adding secret to GitHub...${NC}"
+        if gh secret set AWS_ROLE_ARN --body "${ROLE_ARN}" --repo "${GITHUB_REPO}" 2>/dev/null; then
+            echo -e "${GREEN}✓ AWS_ROLE_ARN secret added to GitHub successfully${NC}"
+        else
+            echo -e "${YELLOW}Could not add secret automatically. Please add manually:${NC}"
+            echo -e "   ${GREEN}AWS_ROLE_ARN${NC} = ${ROLE_ARN}"
+            echo -e "   URL: https://github.com/${GITHUB_REPO}/settings/secrets/actions"
+        fi
+    else
+        echo -e "${YELLOW}GitHub CLI (gh) not found. Please add secret manually:${NC}"
+        echo -e "   ${GREEN}AWS_ROLE_ARN${NC} = ${ROLE_ARN}"
+        echo -e "   URL: https://github.com/${GITHUB_REPO}/settings/secrets/actions"
+    fi
+else
+    echo -e "${YELLOW}Skipped. Add this secret manually to GitHub:${NC}"
+    echo -e "   ${GREEN}AWS_ROLE_ARN${NC} = ${ROLE_ARN}"
+    echo -e "   URL: https://github.com/${GITHUB_REPO}/settings/secrets/actions"
+fi
+
 echo ""
 echo "2. Update terraform/variables.tf if needed (region, etc.)"
 echo ""

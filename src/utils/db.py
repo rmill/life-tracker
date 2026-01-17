@@ -9,12 +9,12 @@ logger = setup_logger(__name__)
 
 class MetricsDB:
     """DynamoDB interface for metrics storage."""
-    
+
     def __init__(self):
         self.dynamodb = boto3.resource('dynamodb')
         self.metrics_table = self.dynamodb.Table(os.environ.get('METRICS_TABLE', 'life-stats-metrics'))
         self.runs_table = self.dynamodb.Table(os.environ.get('RUNS_TABLE', 'life-stats-runs'))
-    
+
     def store_metrics(self, user_id: str, metric_type: str, data_points: List[Dict[str, Any]]) -> None:
         """Store metric data points in DynamoDB."""
         with self.metrics_table.batch_writer() as batch:
@@ -29,7 +29,7 @@ class MetricsDB:
                 }
                 batch.put_item(Item=item)
                 logger.debug(f"Stored metric: {item}")
-    
+
     def get_last_run(self, user_id: str, metric_type: str) -> Optional[str]:
         """Get the last successful run timestamp for a user/metric."""
         try:
@@ -45,7 +45,7 @@ class MetricsDB:
         except Exception as e:
             logger.warning(f"Could not retrieve last run: {e}")
             return None
-    
+
     def update_last_run(self, user_id: str, metric_type: str) -> None:
         """Update the last run timestamp."""
         now = datetime.now(timezone.utc).isoformat()
@@ -57,7 +57,7 @@ class MetricsDB:
             }
         )
         logger.debug(f"Updated last run for {user_id}/{metric_type}: {now}")
-    
+
     def get_all_users(self) -> List[str]:
         """Get list of all users from runs table."""
         try:

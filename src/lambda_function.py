@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 from typing import Dict, Any, Optional
 from integrations.registry import IntegrationRegistry
 from utils.db import MetricsDB
@@ -12,22 +11,22 @@ logger = setup_logger(__name__)
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Lambda handler for metrics collection.
-    
+
     Event payload:
     - metric: Optional[str] - Specific metric to run (e.g., 'steps'). If not provided, runs all.
     - user_id: Optional[str] - Specific user. If not provided, runs for all users.
     """
     logger.info(f"Lambda invoked with event: {json.dumps(event)}")
-    
+
     metric_name = event.get('metric')
     user_id = event.get('user_id')
-    
+
     db = MetricsDB()
     registry = IntegrationRegistry()
-    
+
     results = []
     errors = []
-    
+
     try:
         # Determine which metrics to run
         if metric_name:
@@ -36,26 +35,26 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         else:
             metrics_to_run = registry.list_metrics()
             logger.info(f"Running all metrics: {metrics_to_run}")
-        
+
         # Determine which users to process
         users = [user_id] if user_id else db.get_all_users()
         logger.info(f"Processing {len(users)} user(s)")
-        
+
         # Process each metric for each user
         for metric in metrics_to_run:
             for uid in users:
                 try:
                     logger.info(f"Processing metric '{metric}' for user '{uid}'")
                     integration = registry.get_integration(metric, uid)
-                    
+
                     # Get last run time
                     last_run = db.get_last_run(uid, metric)
                     logger.info(f"Last run for {uid}/{metric}: {last_run}")
-                    
+
                     # Fetch and store data
                     data_points = integration.fetch_data(last_run)
                     logger.info(f"Fetched {len(data_points)} data points")
-                    
+
                     if data_points:
                         db.store_metrics(uid, metric, data_points)
                         db.update_last_run(uid, metric)
@@ -74,7 +73,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                             'count': 0,
                             'status': 'no_data'
                         })
-                        
+
                 except Exception as e:
                     error_msg = f"Error processing {metric} for {uid}: {str(e)}"
                     logger.error(error_msg, exc_info=True)
@@ -83,7 +82,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         'metric': metric,
                         'error': str(e)
                     })
-        
+
         response = {
             'statusCode': 200 if not errors else 207,
             'body': json.dumps({
@@ -93,10 +92,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'total_errors': len(errors)
             })
         }
-        
+
         logger.info(f"Lambda execution completed: {len(results)} successful, {len(errors)} errors")
         return response
-        
+
     except Exception as e:
         logger.error(f"Fatal error in Lambda handler: {str(e)}", exc_info=True)
         return {
