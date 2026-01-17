@@ -266,7 +266,9 @@ def test_end_to_end_with_real_oauth(lambda_client, dynamodb_client, lambda_funct
     
     body = json.loads(payload['body'])
     assert 'results' in body
-    assert test_user_id in body['results']
+    assert len(body['results']) > 0
+    assert body['results'][0]['user_id'] == test_user_id
+    assert body['results'][0]['status'] == 'success'
     
     # Verify data was written to metrics table
     result = metrics_table.query(
