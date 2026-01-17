@@ -147,20 +147,18 @@ def test_google_fit_api_scopes():
 
 
 @pytest.mark.skipif(
-    os.environ.get('SKIP_LIVE_API_TESTS', 'true').lower() == 'true',
-    reason="Live API tests disabled by default"
+    os.environ.get('SKIP_LIVE_API_TESTS', 'false').lower() == 'true',
+    reason="Live API tests disabled - set SKIP_LIVE_API_TESTS=false to enable"
 )
 def test_google_fit_live_api_call(ssm_client):
     """
     Test actual Google Fit API call with real credentials.
-    Skipped by default - set SKIP_LIVE_API_TESTS=false to enable.
+    REQUIRED: This test must pass to ensure Google Fit integration works.
     """
     from integrations.google_fit import GoogleFitStepsIntegration
     
-    # This requires a real user with valid OAuth token
-    test_user = os.environ.get('TEST_USER_ID')
-    if not test_user:
-        pytest.skip("TEST_USER_ID not set for live API test")
+    # Check if test user is configured
+    test_user = os.environ.get('TEST_USER_ID', 'test-user')
     
     try:
         integration = GoogleFitStepsIntegration(test_user)
@@ -170,18 +168,20 @@ def test_google_fit_live_api_call(ssm_client):
         data = integration.fetch_data(since)
         
         # Should return list (may be empty if no data)
-        assert isinstance(data, list)
+        assert isinstance(data, list), "Google Fit API should return a list"
         
         # If data exists, validate structure
         if data:
             for point in data:
-                assert 'date' in point
-                assert 'value' in point
-                assert 'timestamp' in point
-                assert isinstance(point['value'], (int, float))
+                assert 'date' in point, "Data point must have 'date'"
+                assert 'value' in point, "Data point must have 'value'"
+                assert 'timestamp' in point, "Data point must have 'timestamp'"
+                assert isinstance(point['value'], (int, float)), "Value must be numeric"
+        
+        print(f"✓ Google Fit integration working - fetched {len(data)} data points")
                 
     except Exception as e:
-        pytest.fail(f"Live API call failed: {e}")
+        pytest.fail(f"Google Fit integration failed - REQUIRED for deployment: {e}")
 
 
 def test_error_handling_invalid_credentials():
