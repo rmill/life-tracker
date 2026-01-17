@@ -145,33 +145,31 @@ resource "aws_cloudwatch_log_group" "lambda_logs" {
   }
 }
 
-# Lambda Function
-data "archive_file" "lambda_zip" {
-  type        = "zip"
-  source_dir  = "${path.module}/../src"
-  output_path = "${path.module}/lambda_function.zip"
-  excludes    = ["__pycache__", "*.pyc", ".pytest_cache"]
-}
-
-resource "null_resource" "install_dependencies" {
+# Lambda Function Package
+resource "null_resource" "lambda_package" {
   triggers = {
     requirements = filemd5("${path.module}/../requirements-lambda.txt")
+    source_hash  = sha256(join("", [for f in fileset("${path.module}/../src", "**") : filesha256("${path.module}/../src/${f}")]))
   }
 
   provisioner "local-exec" {
     command = <<EOF
       cd ${path.module}/..
-      pip install -r requirements-lambda.txt -t src/ --upgrade
+      rm -rf lambda_package
+      mkdir -p lambda_package
+      cp -r src/* lambda_package/
+      pip install -r requirements-lambda.txt -t lambda_package/ --upgrade
+      cd lambda_package && zip -r ../terraform/lambda_function.zip . -x "*.pyc" -x "__pycache__/*"
     EOF
   }
 }
 
 resource "aws_lambda_function" "metrics_collector" {
-  filename         = data.archive_file.lambda_zip.output_path
+  filename         = "${path.module}/lambda_function.zip"
   function_name    = var.project_name
   role            = aws_iam_role.lambda_role.arn
   handler         = "lambda_function.handler"
-  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  source_code_hash = filebase64sha256("${path.module}/lambda_function.zip")
   runtime         = "python3.11"
   timeout         = 300
   memory_size     = 256
@@ -193,7 +191,7 @@ resource "aws_lambda_function" "metrics_collector" {
   depends_on = [
     aws_cloudwatch_log_group.lambda_logs,
     aws_iam_role_policy.lambda_policy,
-    null_resource.install_dependencies
+    null_resource.lambda_package
   ]
 }
 
