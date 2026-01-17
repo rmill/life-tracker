@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta, timezone
 
 
@@ -22,7 +22,7 @@ class BaseIntegration(ABC):
         """
         pass
     
-    def _get_date_range(self, since: Optional[str] = None) -> tuple[datetime, datetime]:
+    def _get_date_range(self, since: Optional[str] = None) -> Tuple[datetime, datetime]:
         """Calculate date range for data fetch."""
         end_date = datetime.now(timezone.utc)
         

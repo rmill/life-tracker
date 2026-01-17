@@ -152,7 +152,54 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements-lambda.txt
 ```
 
-### Testing Lambda Locally
+## Testing
+
+### Run Functional Tests
+
+```bash
+# Install test dependencies
+pip install -r requirements-test.txt
+
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run specific test
+pytest tests/test_functional.py::test_database_schema_metrics
+```
+
+**Note:** Functional tests require AWS credentials and will create temporary DynamoDB tables (`life-stats-metrics-test`, `life-stats-runs-test`).
+
+### Test External API Integrations
+
+Validate connectivity and authentication with external services:
+
+```bash
+# Run external API tests
+pytest tests/test_external_api.py -v
+
+# Run with live API calls (requires valid test user)
+SKIP_LIVE_API_TESTS=false TEST_USER_ID=your-test-user pytest tests/test_external_api.py -v
+```
+
+**Note:** External API tests validate Google Fit integration, credential configuration, and API client libraries.
+
+### Run Integration Tests
+
+Integration tests validate the deployed infrastructure:
+
+```bash
+# Run integration tests against deployed resources
+pytest tests/test_integration.py -v
+```
+
+**Note:** Integration tests require the infrastructure to be deployed and AWS credentials configured.
+
+### Manual Testing
+
+Test the Lambda function manually without pytest:
 
 ```bash
 # Test all metrics for all users
