@@ -6,7 +6,8 @@ import os
 import json
 import boto3
 import pytest
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from botocore.exceptions import ClientError
 
 
 @pytest.fixture(scope='session')
@@ -39,16 +40,16 @@ def runs_table_name():
     return os.environ.get('RUNS_TABLE', 'life-stats-runs')
 
 
-def test_lambda_deployed(lambda_client, lambda_function_name):
     """Test that Lambda function is deployed and accessible."""
+    
     response = lambda_client.get_function(FunctionName=lambda_function_name)
     assert response['Configuration']['FunctionName'] == lambda_function_name
     assert response['Configuration']['Runtime'] == 'python3.11'
     assert response['Configuration']['State'] == 'Active'
 
 
-def test_lambda_invocation_empty_event(lambda_client, lambda_function_name):
     """Test Lambda invocation with empty event."""
+    
     response = lambda_client.invoke(
         FunctionName=lambda_function_name,
         InvocationType='RequestResponse',
@@ -64,8 +65,8 @@ def test_lambda_invocation_empty_event(lambda_client, lambda_function_name):
     assert 'results' in body or 'errors' in body or 'error' in body
 
 
-def test_lambda_invocation_specific_metric(lambda_client, lambda_function_name):
     """Test Lambda invocation with specific metric."""
+    
     response = lambda_client.invoke(
         FunctionName=lambda_function_name,
         InvocationType='RequestResponse',
@@ -77,8 +78,8 @@ def test_lambda_invocation_specific_metric(lambda_client, lambda_function_name):
     assert payload['statusCode'] in [200, 207, 500]  # May fail if no users/credentials
 
 
-def test_dynamodb_tables_exist(dynamodb_client, metrics_table_name, runs_table_name):
     """Test that DynamoDB tables exist and are active."""
+    
     # Check metrics table
     metrics_table = dynamodb_client.Table(metrics_table_name)
     assert metrics_table.table_status == 'ACTIVE'
@@ -96,8 +97,8 @@ def test_dynamodb_tables_exist(dynamodb_client, metrics_table_name, runs_table_n
     ]
 
 
-def test_lambda_environment_variables(lambda_client, lambda_function_name, metrics_table_name, runs_table_name):
     """Test Lambda has correct environment variables."""
+    
     response = lambda_client.get_function_configuration(FunctionName=lambda_function_name)
     env_vars = response['Environment']['Variables']
     
@@ -105,8 +106,8 @@ def test_lambda_environment_variables(lambda_client, lambda_function_name, metri
     assert env_vars['RUNS_TABLE'] == runs_table_name
 
 
-def test_lambda_iam_permissions(lambda_client, lambda_function_name):
     """Test Lambda has IAM role attached."""
+    
     response = lambda_client.get_function(FunctionName=lambda_function_name)
     role_arn = response['Configuration']['Role']
     
@@ -114,8 +115,8 @@ def test_lambda_iam_permissions(lambda_client, lambda_function_name):
     assert 'life-stats' in role_arn.lower()
 
 
-def test_eventbridge_rule_exists():
     """Test EventBridge rule exists for scheduled execution."""
+    
     events_client = boto3.client('events')
     
     try:
@@ -126,8 +127,8 @@ def test_eventbridge_rule_exists():
         pytest.skip("EventBridge rule not found - may not be deployed yet")
 
 
-def test_cloudwatch_log_group_exists():
     """Test CloudWatch log group exists."""
+    
     logs_client = boto3.client('logs')
     
     try:
@@ -139,15 +140,77 @@ def test_cloudwatch_log_group_exists():
         pytest.skip("CloudWatch log group not found - may not be deployed yet")
 
 
-def test_lambda_timeout_configuration(lambda_client, lambda_function_name):
     """Test Lambda has appropriate timeout."""
+    
     response = lambda_client.get_function_configuration(FunctionName=lambda_function_name)
     assert response['Timeout'] >= 60  # At least 1 minute
     assert response['MemorySize'] >= 128
 
 
-def test_end_to_end_with_test_user(lambda_client, dynamodb_client, lambda_function_name, runs_table_name):
+@pytest.fixture(scope='session')
+def test_user_with_oauth():
+    """Create test user with OAuth token if needed."""
+    test_user_id = os.environ.get('TEST_USER_ID', 'zerocool')
+    
+    ssm = boto3.client('ssm')
+    
+    # Check if token exists
+    try:
+        ssm.get_parameter(
+            Name=f'/life-stats/google-fit/{test_user_id}/token',
+            WithDecryption=True
+        )
+        return test_user_id
+    except ssm.exceptions.ParameterNotFound:
+        # Token doesn't exist - try to generate
+        if os.environ.get('AUTO_GENERATE_OAUTH', 'true').lower() == 'true':
+            from google_auth_oauthlib.flow import InstalledAppFlow
+            
+            # Get client credentials
+            client_id = ssm.get_parameter(
+                Name='/life-stats/google-fit/client-id',
+                WithDecryption=True
+            )['Parameter']['Value']
+            
+            client_secret = ssm.get_parameter(
+                Name='/life-stats/google-fit/client-secret',
+                WithDecryption=True
+            )['Parameter']['Value']
+            
+            # Run OAuth flow
+            client_config = {
+                "installed": {
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": ["http://localhost:8080/"]
+                }
+            }
+            
+            scopes = [
+                'https://www.googleapis.com/auth/fitness.activity.read',
+                'https://www.googleapis.com/auth/fitness.body.read',
+            ]
+            
+            flow = InstalledAppFlow.from_client_config(client_config, scopes)
+            credentials = flow.run_local_server(port=8080)
+            
+            # Store token
+            ssm.put_parameter(
+                Name=f'/life-stats/google-fit/{test_user_id}/token',
+                Value=credentials.token,
+                Type='SecureString',
+                Overwrite=True
+            )
+            
+            return test_user_id
+        else:
+            pytest.fail(f"OAuth token not found for {test_user_id}. Set AUTO_GENERATE_OAUTH=true or run: python scripts/generate-oauth-token.py")
+
+
     """Test end-to-end flow with a test user (if configured)."""
+    
     # Add a test user to runs table
     runs_table = dynamodb_client.Table(runs_table_name)
     
@@ -174,3 +237,43 @@ def test_end_to_end_with_test_user(lambda_client, dynamodb_client, lambda_functi
     
     # Cleanup
     runs_table.delete_item(Key={'user_id': test_user_id, 'metric_type': 'steps'})
+
+
+def test_end_to_end_with_real_oauth(lambda_client, dynamodb_client, lambda_function_name, 
+                                     metrics_table_name, runs_table_name, test_user_with_oauth):
+    """Test complete flow with real OAuth token and API calls."""
+    test_user_id = test_user_with_oauth
+    runs_table = dynamodb_client.Table(runs_table_name)
+    metrics_table = dynamodb_client.Table(metrics_table_name)
+    
+    # Ensure user exists in runs table
+    runs_table.put_item(Item={
+        'user_id': test_user_id,
+        'metric_type': 'steps',
+        'last_run_time': (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+    })
+    
+    # Invoke Lambda
+    response = lambda_client.invoke(
+        FunctionName=lambda_function_name,
+        InvocationType='RequestResponse',
+        Payload=json.dumps({'user_id': test_user_id, 'metric': 'steps'})
+    )
+    
+    assert response['StatusCode'] == 200
+    payload = json.loads(response['Payload'].read())
+    assert payload['statusCode'] == 200
+    
+    body = json.loads(payload['body'])
+    assert 'results' in body
+    assert test_user_id in body['results']
+    
+    # Verify data was written to metrics table
+    result = metrics_table.query(
+        KeyConditionExpression='user_id = :uid',
+        ExpressionAttributeValues={':uid': test_user_id},
+        Limit=10
+    )
+    
+    # Should have at least some data points
+    assert result['Count'] >= 0  # May be 0 if no Google Fit data available

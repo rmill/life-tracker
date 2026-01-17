@@ -180,11 +180,14 @@ Validate connectivity and authentication with external services:
 # Run external API tests
 pytest tests/test_external_api.py -v
 
-# Run with live API calls (requires valid test user)
-SKIP_LIVE_API_TESTS=false TEST_USER_ID=your-test-user pytest tests/test_external_api.py -v
+# Run with live API calls and OAuth auto-generation (opens browser)
+TEST_USER_ID=your-test-user AUTO_GENERATE_OAUTH=true SKIP_LIVE_API_TESTS=false pytest tests/test_external_api.py -v
+
+# Run with existing OAuth token
+TEST_USER_ID=your-test-user SKIP_LIVE_API_TESTS=false pytest tests/test_external_api.py -v
 ```
 
-**Note:** External API tests validate Google Fit integration, credential configuration, and API client libraries.
+**Note:** External API tests validate Google Fit integration, credential configuration, and API client libraries. Live API tests require a valid OAuth token.
 
 ### Run Integration Tests
 
@@ -193,9 +196,15 @@ Integration tests validate the deployed infrastructure:
 ```bash
 # Run integration tests against deployed resources
 pytest tests/test_integration.py -v
+
+# Run with OAuth token generation (opens browser for authorization)
+TEST_USER_ID=your-test-user AUTO_GENERATE_OAUTH=true pytest tests/test_integration.py::test_end_to_end_with_real_oauth -v
+
+# Run with existing OAuth token
+TEST_USER_ID=your-test-user pytest tests/test_integration.py::test_end_to_end_with_real_oauth -v
 ```
 
-**Note:** Integration tests require the infrastructure to be deployed and AWS credentials configured.
+**Note:** Integration tests require the infrastructure to be deployed and AWS credentials configured. The `test_end_to_end_with_real_oauth` test requires a valid Google Fit OAuth token.
 
 ### Manual Testing
 

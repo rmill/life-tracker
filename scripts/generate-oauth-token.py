@@ -33,10 +33,10 @@ def main():
     print("Google Fit OAuth Token Generator")
     print("=" * 50)
     
-    user_id = input("Enter user ID (e.g., 'test-user'): ").strip()
+    user_id = input("Enter user ID (default: zerocool): ").strip()
     if not user_id:
-        print("Error: User ID is required")
-        sys.exit(1)
+        user_id = "zerocool"
+        print(f"Using default user ID: {user_id}")
     
     print("\nFetching client credentials from SSM...")
     try:
@@ -52,7 +52,7 @@ def main():
             "client_secret": client_secret,
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
-            "redirect_uris": ["http://localhost:8080/"]
+            "redirect_uris": ["http://localhost:8080/", "urn:ietf:wg:oauth:2.0:oob"]
         }
     }
     
@@ -65,12 +65,24 @@ def main():
     
     # Store token in SSM
     print(f"\n✓ Authorization successful!")
-    print(f"Storing token in SSM for user '{user_id}'...")
+    print(f"Storing credentials in SSM for user '{user_id}'...")
     
     ssm = boto3.client('ssm', region_name='us-west-2')
+    
+    # Store as JSON with refresh token
+    import json
+    creds_data = {
+        'token': credentials.token,
+        'refresh_token': credentials.refresh_token,
+        'token_uri': credentials.token_uri,
+        'client_id': credentials.client_id,
+        'client_secret': credentials.client_secret,
+        'scopes': credentials.scopes
+    }
+    
     ssm.put_parameter(
         Name=f'/life-stats/google-fit/{user_id}/token',
-        Value=credentials.token,
+        Value=json.dumps(creds_data),
         Type='SecureString',
         Overwrite=True
     )

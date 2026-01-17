@@ -23,25 +23,21 @@ class GoogleFitStepsIntegration(BaseIntegration):
             # Get OAuth token for this user
             token_param = f"/life-stats/google-fit/{self.user_id}/token"
             response = self.ssm.get_parameter(Name=token_param, WithDecryption=True)
-            token = response['Parameter']['Value']
-
-            # Get client credentials
-            client_id = self.ssm.get_parameter(
-                Name="/life-stats/google-fit/client-id",
-                WithDecryption=True
-            )['Parameter']['Value']
-
-            client_secret = self.ssm.get_parameter(
-                Name="/life-stats/google-fit/client-secret",
-                WithDecryption=True
-            )['Parameter']['Value']
+            token_data = response['Parameter']['Value']
+            
+            # Parse JSON credentials
+            import json
+            creds = json.loads(token_data)
 
             logger.info(f"Retrieved credentials for user {self.user_id}")
 
             return Credentials(
-                token=token,
-                client_id=client_id,
-                client_secret=client_secret
+                token=creds.get('token'),
+                refresh_token=creds.get('refresh_token'),
+                token_uri=creds.get('token_uri'),
+                client_id=creds.get('client_id'),
+                client_secret=creds.get('client_secret'),
+                scopes=creds.get('scopes')
             )
         except Exception as e:
             logger.error(f"Failed to retrieve credentials: {e}")

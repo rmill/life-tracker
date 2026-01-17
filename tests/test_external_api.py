@@ -32,25 +32,81 @@ def google_fit_credentials_exist(ssm_client):
         return False
 
 
+@pytest.fixture(scope='session')
+def test_user_with_oauth(ssm_client):
+    """Create test user with OAuth token if needed."""
+    test_user_id = os.environ.get('TEST_USER_ID', 'zerocool')
+    
+    # Check if token exists
+    try:
+        ssm_client.get_parameter(
+            Name=f'/life-stats/google-fit/{test_user_id}/token',
+            WithDecryption=True
+        )
+        return test_user_id
+    except ClientError:
+        # Token doesn't exist - try to generate
+        if os.environ.get('AUTO_GENERATE_OAUTH', 'true').lower() == 'true':
+            from google_auth_oauthlib.flow import InstalledAppFlow
+            
+            # Get client credentials
+            client_id = ssm_client.get_parameter(
+                Name='/life-stats/google-fit/client-id',
+                WithDecryption=True
+            )['Parameter']['Value']
+            
+            client_secret = ssm_client.get_parameter(
+                Name='/life-stats/google-fit/client-secret',
+                WithDecryption=True
+            )['Parameter']['Value']
+            
+            # Run OAuth flow
+            client_config = {
+                "installed": {
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": ["http://localhost:8080/"]
+                }
+            }
+            
+            scopes = [
+                'https://www.googleapis.com/auth/fitness.activity.read',
+                'https://www.googleapis.com/auth/fitness.body.read',
+            ]
+            
+            flow = InstalledAppFlow.from_client_config(client_config, scopes)
+            credentials = flow.run_local_server(port=8080)
+            
+            # Store token
+            ssm_client.put_parameter(
+                Name=f'/life-stats/google-fit/{test_user_id}/token',
+                Value=credentials.token,
+                Type='SecureString',
+                Overwrite=True
+            )
+            
+            return test_user_id
+        else:
+            pytest.fail(f"OAuth token not found for {test_user_id}. Set AUTO_GENERATE_OAUTH=true or run: python scripts/generate-oauth-token.py")
+
+
 def test_google_fit_credentials_configured(ssm_client):
     """Test that Google Fit credentials are stored in SSM."""
-    try:
-        client_id = ssm_client.get_parameter(
-            Name='/life-stats/google-fit/client-id',
-            WithDecryption=True
-        )
-        assert client_id['Parameter']['Value'] is not None
-        assert len(client_id['Parameter']['Value']) > 0
-        
-        client_secret = ssm_client.get_parameter(
-            Name='/life-stats/google-fit/client-secret',
-            WithDecryption=True
-        )
-        assert client_secret['Parameter']['Value'] is not None
-        assert len(client_secret['Parameter']['Value']) > 0
-        
-    except ClientError as e:
-        pytest.fail(f"Google Fit credentials not configured in SSM: {e}")
+    client_id = ssm_client.get_parameter(
+        Name='/life-stats/google-fit/client-id',
+        WithDecryption=True
+    )
+    assert client_id['Parameter']['Value'] is not None
+    assert len(client_id['Parameter']['Value']) > 0
+    
+    client_secret = ssm_client.get_parameter(
+        Name='/life-stats/google-fit/client-secret',
+        WithDecryption=True
+    )
+    assert client_secret['Parameter']['Value'] is not None
+    assert len(client_secret['Parameter']['Value']) > 0
 
 
 def test_google_fit_integration_instantiation(google_fit_credentials_exist):
@@ -150,18 +206,17 @@ def test_google_fit_api_scopes():
     os.environ.get('SKIP_LIVE_API_TESTS', 'false').lower() == 'true',
     reason="Live API tests disabled - set SKIP_LIVE_API_TESTS=false to enable"
 )
-def test_google_fit_live_api_call(ssm_client):
+def test_google_fit_live_api_call(test_user_with_oauth):
     """
     Test actual Google Fit API call with real credentials.
     REQUIRED: This test must pass to ensure Google Fit integration works.
     """
     from integrations.google_fit import GoogleFitStepsIntegration
     
-    # Check if test user is configured
-    test_user = os.environ.get('TEST_USER_ID', 'test-user')
+    test_user_id = test_user_with_oauth
     
     try:
-        integration = GoogleFitStepsIntegration(test_user)
+        integration = GoogleFitStepsIntegration(test_user_id)
         
         # Fetch last 2 days of data
         since = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()

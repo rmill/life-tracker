@@ -38,6 +38,7 @@ def dynamodb_client():
 @pytest.fixture(scope='session')
 def setup_dynamodb_tables(dynamodb_client):
     """Create test DynamoDB tables."""
+    
     metrics_table = os.environ['METRICS_TABLE']
     runs_table = os.environ['RUNS_TABLE']
     

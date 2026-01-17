@@ -97,6 +97,7 @@ jobs:
         env:
           SKIP_LIVE_API_TESTS: false
           TEST_USER_ID: test-user
+          AUTO_GENERATE_OAUTH: false
         run: |
           pytest tests/test_external_api.py -v
 
