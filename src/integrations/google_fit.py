@@ -24,7 +24,7 @@ class GoogleFitStepsIntegration(BaseIntegration):
             token_param = f"/life-stats/google-fit/{self.user_id}/token"
             response = self.ssm.get_parameter(Name=token_param, WithDecryption=True)
             token_data = response['Parameter']['Value']
-            
+
             # Parse JSON credentials
             import json
             creds = json.loads(token_data)
