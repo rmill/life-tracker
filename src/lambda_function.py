@@ -1,6 +1,5 @@
 import json
-import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from integrations.registry import IntegrationRegistry
 from utils.db import MetricsDB
 from utils.logger import setup_logger
