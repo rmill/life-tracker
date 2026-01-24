@@ -68,6 +68,7 @@ jobs:
 
       - name: Run integration tests (pre-deployment)
         run: |
+          export PYTHONPATH="${PYTHONPATH}:${PWD}/src"
           pytest tests/test_*_integration.py -v
 
   test-external-api:
