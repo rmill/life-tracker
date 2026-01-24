@@ -1,4 +1,5 @@
 """External API tests for Open-Meteo weather integration."""
+# -*- coding: utf-8 -*-
 import pytest
 import requests
 from datetime import datetime, timedelta
