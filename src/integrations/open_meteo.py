@@ -1,5 +1,6 @@
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
+from decimal import Decimal
 import requests
 from integrations.base import BaseIntegration
 from utils.logger import setup_logger
@@ -16,6 +17,12 @@ class OpenMeteoWeatherIntegration(BaseIntegration):
 
     def __init__(self, user_id: str):
         super().__init__(user_id)
+
+    def _to_decimal(self, value):
+        """Convert float/int to Decimal for DynamoDB, handle None."""
+        if value is None:
+            return Decimal('0')
+        return Decimal(str(value))
 
     def fetch_data(self, since: Optional[str] = None, until: Optional[str] = None) -> List[Dict[str, Any]]:
         """Fetch daily weather data from Open-Meteo API."""
@@ -58,13 +65,13 @@ class OpenMeteoWeatherIntegration(BaseIntegration):
                 data_points.append({
                     'date': date_str,
                     'value': {
-                        'temp_max': daily['temperature_2m_max'][i],
-                        'temp_min': daily['temperature_2m_min'][i],
-                        'humidity_mean': daily['relative_humidity_2m_mean'][i],
-                        'pressure_mean': daily['surface_pressure_mean'][i],
-                        'precipitation': daily['precipitation_sum'][i],
-                        'wind_max': daily['wind_speed_10m_max'][i],
-                        'sunshine_duration': daily['sunshine_duration'][i]
+                        'temp_max': self._to_decimal(daily['temperature_2m_max'][i]),
+                        'temp_min': self._to_decimal(daily['temperature_2m_min'][i]),
+                        'humidity_mean': self._to_decimal(daily['relative_humidity_2m_mean'][i]),
+                        'pressure_mean': self._to_decimal(daily['surface_pressure_mean'][i]),
+                        'precipitation': self._to_decimal(daily['precipitation_sum'][i]),
+                        'wind_max': self._to_decimal(daily['wind_speed_10m_max'][i]),
+                        'sunshine_duration': self._to_decimal(daily['sunshine_duration'][i])
                     },
                     'timestamp': datetime.now(timezone.utc).isoformat()
                 })
