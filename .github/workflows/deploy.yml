@@ -64,7 +64,7 @@ jobs:
 
       - name: Run functional tests
         run: |
-          pytest tests/test_functional.py -v
+          pytest tests/test_functional.py tests/test_weather_functional.py -v
 
   test-external-api:
     name: Test External API Integrations
