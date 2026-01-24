@@ -68,7 +68,7 @@ jobs:
 
       - name: Run integration tests (pre-deployment)
         run: |
-          pytest tests/test_weather_integration.py -v
+          pytest tests/test_*_integration.py -v
 
   test-external-api:
     name: Test External API Integrations
