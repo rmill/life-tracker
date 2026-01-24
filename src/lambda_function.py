@@ -49,12 +49,22 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     - start_date: Optional[str] - Start date (YYYY-MM-DD). Overrides last_run logic.
     - end_date: Optional[str] - End date (YYYY-MM-DD). Defaults to now.
     """
-    logger.info(f"Lambda invoked with event: {json.dumps(event)}")
-
     metric_name = event.get('metric')
     user_id = event.get('user_id')
     start_date = event.get('start_date')
     end_date = event.get('end_date')
+
+    # Determine run type
+    is_manual = bool(start_date or end_date)
+    run_type = "MANUAL" if is_manual else "AUTOMATIC"
+
+    # Log run parameters
+    logger.info(f"=== Lambda Invocation ({run_type}) ===")
+    logger.info(f"User ID: {user_id or 'all users'}")
+    logger.info(f"Metric: {metric_name or 'all metrics'}")
+    logger.info(f"Start Date: {start_date or 'from last run'}")
+    logger.info(f"End Date: {end_date or 'now'}")
+    logger.info("=" * 50)
 
     db = MetricsDB()
     registry = IntegrationRegistry()
