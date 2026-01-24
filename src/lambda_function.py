@@ -7,6 +7,38 @@ from utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 
+def _process_metric(uid: str, metric: str, integration, db: MetricsDB, start_date: str, end_date: str) -> Dict[str, Any]:
+    """Process a single metric for a user."""
+    logger.info(f"Processing metric '{metric}' for user '{uid}'")
+
+    # Get last run time or use provided start_date
+    if start_date:
+        last_run = start_date
+        logger.info(f"Using provided start_date: {start_date}")
+    else:
+        last_run = db.get_last_run(uid, metric)
+        logger.info(f"Last run for {uid}/{metric}: {last_run}")
+
+    # Fetch and store data
+    data_points = integration.fetch_data(last_run, end_date)
+    logger.info(f"Fetched {len(data_points)} data points")
+
+    # Log actual values
+    for point in data_points:
+        logger.info(f"{uid}/{metric} - {point['date']}: {point['value']}")
+
+    if data_points:
+        db.store_metrics(uid, metric, data_points)
+        # Only update last_run if not using manual date override
+        if not start_date:
+            db.update_last_run(uid, metric)
+        logger.info(f"Successfully stored {len(data_points)} points for {uid}/{metric}")
+        return {'user_id': uid, 'metric': metric, 'count': len(data_points), 'status': 'success'}
+    else:
+        logger.info(f"No new data for {uid}/{metric}")
+        return {'user_id': uid, 'metric': metric, 'count': 0, 'status': 'no_data'}
+
+
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Lambda handler for metrics collection.
@@ -32,12 +64,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     try:
         # Determine which metrics to run
-        if metric_name:
-            metrics_to_run = [metric_name]
-            logger.info(f"Running single metric: {metric_name}")
-        else:
-            metrics_to_run = registry.list_metrics()
-            logger.info(f"Running all metrics: {metrics_to_run}")
+        metrics_to_run = [metric_name] if metric_name else registry.list_metrics()
+        logger.info(f"Running metrics: {metrics_to_run}")
 
         # Determine which users to process
         users = [user_id] if user_id else db.get_all_users()
@@ -47,56 +75,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         for metric in metrics_to_run:
             for uid in users:
                 try:
-                    logger.info(f"Processing metric '{metric}' for user '{uid}'")
                     integration = registry.get_integration(metric, uid)
-
-                    # Get last run time or use provided start_date
-                    if start_date:
-                        last_run = start_date  # Pass as-is, will be parsed as YYYY-MM-DD
-                        logger.info(f"Using provided start_date: {start_date}")
-                    else:
-                        last_run = db.get_last_run(uid, metric)
-                        logger.info(f"Last run for {uid}/{metric}: {last_run}")
-
-                    # Fetch and store data
-                    data_points = integration.fetch_data(last_run, end_date)
-                    logger.info(f"Fetched {len(data_points)} data points")
-
-                    # Log actual values
-                    for point in data_points:
-                        logger.info(f"{uid}/{metric} - {point['date']}: {point['value']}")
-
-                    if data_points:
-                        db.store_metrics(uid, metric, data_points)
-                        # Only update last_run if not using manual date override
-                        if not start_date:
-                            db.update_last_run(uid, metric)
-                        results.append({
-                            'user_id': uid,
-                            'metric': metric,
-                            'count': len(data_points),
-                            'status': 'success'
-                        })
-                        logger.info(f"Successfully stored {len(data_points)} points for {uid}/{metric}")
-                    else:
-                        logger.info(f"No new data for {uid}/{metric}")
-                        results.append({
-                            'user_id': uid,
-                            'metric': metric,
-                            'count': 0,
-                            'status': 'no_data'
-                        })
-
+                    result = _process_metric(uid, metric, integration, db, start_date, end_date)
+                    results.append(result)
                 except Exception as e:
                     error_msg = f"Error processing {metric} for {uid}: {str(e)}"
                     logger.error(error_msg, exc_info=True)
-                    errors.append({
-                        'user_id': uid,
-                        'metric': metric,
-                        'error': str(e)
-                    })
+                    errors.append({'user_id': uid, 'metric': metric, 'error': str(e)})
 
-        response = {
+        logger.info(f"Lambda execution completed: {len(results)} successful, {len(errors)} errors")
+        return {
             'statusCode': 200 if not errors else 207,
             'body': json.dumps({
                 'results': results,
@@ -106,14 +94,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             })
         }
 
-        logger.info(f"Lambda execution completed: {len(results)} successful, {len(errors)} errors")
-        return response
-
     except Exception as e:
         logger.error(f"Fatal error in Lambda handler: {str(e)}", exc_info=True)
         return {
             'statusCode': 500,
-            'body': json.dumps({
-                'error': str(e)
-            })
+            'body': json.dumps({'error': str(e)})
         }
