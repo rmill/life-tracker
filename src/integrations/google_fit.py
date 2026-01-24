@@ -5,6 +5,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from integrations.base import BaseIntegration
 from utils.logger import setup_logger
+import pytz
 
 logger = setup_logger(__name__)
 
@@ -12,8 +13,9 @@ logger = setup_logger(__name__)
 class GoogleFitStepsIntegration(BaseIntegration):
     """Google Fit steps metric integration."""
 
-    def __init__(self, user_id: str):
+    def __init__(self, user_id: str, user_timezone: str = 'America/Los_Angeles'):
         super().__init__(user_id)
+        self.user_timezone = pytz.timezone(user_timezone)
         self.ssm = boto3.client('ssm')
         self.credentials = self._get_credentials()
 
@@ -47,14 +49,18 @@ class GoogleFitStepsIntegration(BaseIntegration):
         """Fetch steps data from Google Fit API."""
         start_date, end_date = self._get_date_range(since, until)
 
-        logger.info(f"Fetching Google Fit steps for {self.user_id} from {start_date} to {end_date}")
+        # Convert to user's timezone for proper day boundaries
+        start_local = start_date.astimezone(self.user_timezone).replace(hour=0, minute=0, second=0, microsecond=0)
+        end_local = end_date.astimezone(self.user_timezone).replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        logger.info(f"Fetching Google Fit steps for {self.user_id} from {start_local} to {end_local} ({self.user_timezone})")
 
         try:
             service = build('fitness', 'v1', credentials=self.credentials)
 
             # Convert to milliseconds for Google Fit API
-            start_time_millis = int(start_date.timestamp() * 1000)
-            end_time_millis = int(end_date.timestamp() * 1000)
+            start_time_millis = int(start_local.timestamp() * 1000)
+            end_time_millis = int(end_local.timestamp() * 1000)
 
             # Request daily step counts
             body = {
@@ -75,10 +81,12 @@ class GoogleFitStepsIntegration(BaseIntegration):
                     for point in dataset.get('point', []):
                         if point.get('value'):
                             steps = sum(v.get('intVal', 0) for v in point['value'])
-                            date_str = datetime.fromtimestamp(
+                            # Convert timestamp to user's timezone for date
+                            point_time = datetime.fromtimestamp(
                                 int(point['startTimeNanos']) / 1e9,
-                                tz=timezone.utc
-                            ).strftime('%Y-%m-%d')
+                                tz=self.user_timezone
+                            )
+                            date_str = point_time.strftime('%Y-%m-%d')
 
                             data_points.append({
                                 'date': date_str,
