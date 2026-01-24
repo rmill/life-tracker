@@ -99,7 +99,7 @@ jobs:
           TEST_USER_ID: zerocool
           AUTO_GENERATE_OAUTH: false
         run: |
-          pytest tests/test_external_api.py -v
+          pytest tests/test_external_api.py tests/test_weather_external_api.py -v
 
   terraform:
     name: Terraform Plan & Apply
