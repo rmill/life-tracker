@@ -13,7 +13,7 @@ logger = setup_logger(__name__)
 class GoogleFitStepsIntegration(BaseIntegration):
     """Google Fit steps metric integration."""
 
-    def __init__(self, user_id: str, user_timezone: str = 'America/Los_Angeles'):
+    def __init__(self, user_id: str, user_timezone: str = 'America/Edmonton'):
         super().__init__(user_id)
         self.user_timezone = pytz.timezone(user_timezone)
         self.ssm = boto3.client('ssm')
