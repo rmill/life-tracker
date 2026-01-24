@@ -1,0 +1,73 @@
+name: Manual Backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      metric:
+        description: 'Specific metric to run (leave empty for all)'
+        required: false
+        type: string
+      user_id:
+        description: 'Specific user ID (leave empty for all)'
+        required: false
+        type: string
+      start_date:
+        description: 'Start date (YYYY-MM-DD, defaults to 24 hours ago)'
+        required: false
+        type: string
+      end_date:
+        description: 'End date (YYYY-MM-DD, defaults to now)'
+        required: false
+        type: string
+
+env:
+  AWS_REGION: us-west-2
+
+jobs:
+  invoke:
+    name: Backfill Metrics Data
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build payload
+        id: payload
+        run: |
+          PAYLOAD="{}"
+          if [ -n "${{ inputs.metric }}" ]; then
+            PAYLOAD=$(echo $PAYLOAD | jq --arg m "${{ inputs.metric }}" '. + {metric: $m}')
+          fi
+          if [ -n "${{ inputs.user_id }}" ]; then
+            PAYLOAD=$(echo $PAYLOAD | jq --arg u "${{ inputs.user_id }}" '. + {user_id: $u}')
+          fi
+          if [ -n "${{ inputs.start_date }}" ]; then
+            PAYLOAD=$(echo $PAYLOAD | jq --arg s "${{ inputs.start_date }}" '. + {start_date: $s}')
+          fi
+          if [ -n "${{ inputs.end_date }}" ]; then
+            PAYLOAD=$(echo $PAYLOAD | jq --arg e "${{ inputs.end_date }}" '. + {end_date: $e}')
+          fi
+          echo "payload=$PAYLOAD" >> $GITHUB_OUTPUT
+
+      - name: Invoke Lambda
+        run: |
+          aws lambda invoke \
+            --function-name life-stats \
+            --payload '${{ steps.payload.outputs.payload }}' \
+            --cli-binary-format raw-in-base64-out \
+            response.json
+          
+          echo "Lambda Response:"
+          cat response.json | jq .
+
+      - name: Upload response
+        uses: actions/upload-artifact@v4
+        with:
+          name: lambda-response
+          path: response.json

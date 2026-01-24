@@ -43,9 +43,9 @@ class GoogleFitStepsIntegration(BaseIntegration):
             logger.error(f"Failed to retrieve credentials: {e}")
             raise
 
-    def fetch_data(self, since: Optional[str] = None) -> List[Dict[str, Any]]:
+    def fetch_data(self, since: Optional[str] = None, until: Optional[str] = None) -> List[Dict[str, Any]]:
         """Fetch steps data from Google Fit API."""
-        start_date, end_date = self._get_date_range(since)
+        start_date, end_date = self._get_date_range(since, until)
 
         logger.info(f"Fetching Google Fit steps for {self.user_id} from {start_date} to {end_date}")
 

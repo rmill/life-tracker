@@ -222,21 +222,34 @@ def test_user_with_oauth():
         'last_run_time': datetime.now(timezone.utc).isoformat()
     })
     
-    # Invoke Lambda for this test user
-    response = lambda_client.invoke(
-        FunctionName=lambda_function_name,
-        InvocationType='RequestResponse',
-        Payload=json.dumps({'user_id': test_user_id, 'metric': 'steps'})
-    )
-    
-    assert response['StatusCode'] == 200
-    payload = json.loads(response['Payload'].read())
-    
-    # Should handle gracefully even without SSM credentials
-    assert payload['statusCode'] in [200, 207, 500]
-    
-    # Cleanup
-    runs_table.delete_item(Key={'user_id': test_user_id, 'metric_type': 'steps'})
+    try:
+        # Invoke Lambda for this test user
+        response = lambda_client.invoke(
+            FunctionName=lambda_function_name,
+            InvocationType='RequestResponse',
+            Payload=json.dumps({'user_id': test_user_id, 'metric': 'steps'})
+        )
+        
+        assert response['StatusCode'] == 200
+        payload = json.loads(response['Payload'].read())
+        
+        # Should handle gracefully even without SSM credentials
+        assert payload['statusCode'] in [200, 207, 500]
+    finally:
+        # Cleanup runs table
+        runs_table.delete_item(Key={'user_id': test_user_id, 'metric_type': 'steps'})
+        
+        # Cleanup metrics table
+        metrics_table = dynamodb_client.Table(metrics_table_name)
+        result = metrics_table.query(
+            KeyConditionExpression='user_id = :uid',
+            ExpressionAttributeValues={':uid': test_user_id}
+        )
+        for item in result.get('Items', []):
+            metrics_table.delete_item(Key={
+                'user_id': item['user_id'],
+                'metric_date': item['metric_date']
+            })
 
 
 def test_end_to_end_with_real_oauth(lambda_client, dynamodb_client, lambda_function_name, 
@@ -246,36 +259,56 @@ def test_end_to_end_with_real_oauth(lambda_client, dynamodb_client, lambda_funct
     runs_table = dynamodb_client.Table(runs_table_name)
     metrics_table = dynamodb_client.Table(metrics_table_name)
     
-    # Ensure user exists in runs table
-    runs_table.put_item(Item={
-        'user_id': test_user_id,
-        'metric_type': 'steps',
-        'last_run_time': (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
-    })
+    # Store initial state to restore later
+    try:
+        initial_run = runs_table.get_item(Key={'user_id': test_user_id, 'metric_type': 'steps'})
+        had_initial_run = 'Item' in initial_run
+        initial_run_time = initial_run.get('Item', {}).get('last_run_time')
+    except:
+        had_initial_run = False
+        initial_run_time = None
     
-    # Invoke Lambda
-    response = lambda_client.invoke(
-        FunctionName=lambda_function_name,
-        InvocationType='RequestResponse',
-        Payload=json.dumps({'user_id': test_user_id, 'metric': 'steps'})
-    )
-    
-    assert response['StatusCode'] == 200
-    payload = json.loads(response['Payload'].read())
-    assert payload['statusCode'] == 200
-    
-    body = json.loads(payload['body'])
-    assert 'results' in body
-    assert len(body['results']) > 0
-    assert body['results'][0]['user_id'] == test_user_id
-    assert body['results'][0]['status'] == 'success'
-    
-    # Verify data was written to metrics table
-    result = metrics_table.query(
-        KeyConditionExpression='user_id = :uid',
-        ExpressionAttributeValues={':uid': test_user_id},
-        Limit=10
-    )
-    
-    # Should have at least some data points
-    assert result['Count'] >= 0  # May be 0 if no Google Fit data available
+    try:
+        # Ensure user exists in runs table with old timestamp to force data fetch
+        runs_table.put_item(Item={
+            'user_id': test_user_id,
+            'metric_type': 'steps',
+            'last_run_time': (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+        })
+        
+        # Invoke Lambda
+        response = lambda_client.invoke(
+            FunctionName=lambda_function_name,
+            InvocationType='RequestResponse',
+            Payload=json.dumps({'user_id': test_user_id, 'metric': 'steps'})
+        )
+        
+        assert response['StatusCode'] == 200
+        payload = json.loads(response['Payload'].read())
+        assert payload['statusCode'] == 200
+        
+        body = json.loads(payload['body'])
+        assert 'results' in body
+        assert len(body['results']) > 0
+        assert body['results'][0]['user_id'] == test_user_id
+        assert body['results'][0]['status'] == 'success'
+        
+        # Verify data was written to metrics table
+        result = metrics_table.query(
+            KeyConditionExpression='user_id = :uid',
+            ExpressionAttributeValues={':uid': test_user_id},
+            Limit=10
+        )
+        
+        # Should have at least some data points
+        assert result['Count'] >= 0  # May be 0 if no Google Fit data available
+    finally:
+        # Restore or cleanup runs table
+        if had_initial_run and initial_run_time:
+            runs_table.put_item(Item={
+                'user_id': test_user_id,
+                'metric_type': 'steps',
+                'last_run_time': initial_run_time
+            })
+        elif not had_initial_run:
+            runs_table.delete_item(Key={'user_id': test_user_id, 'metric_type': 'steps'})

@@ -14,11 +14,15 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Event payload:
     - metric: Optional[str] - Specific metric to run (e.g., 'steps'). If not provided, runs all.
     - user_id: Optional[str] - Specific user. If not provided, runs for all users.
+    - start_date: Optional[str] - Start date (YYYY-MM-DD). Overrides last_run logic.
+    - end_date: Optional[str] - End date (YYYY-MM-DD). Defaults to now.
     """
     logger.info(f"Lambda invoked with event: {json.dumps(event)}")
 
     metric_name = event.get('metric')
     user_id = event.get('user_id')
+    start_date = event.get('start_date')
+    end_date = event.get('end_date')
 
     db = MetricsDB()
     registry = IntegrationRegistry()
@@ -46,17 +50,27 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     logger.info(f"Processing metric '{metric}' for user '{uid}'")
                     integration = registry.get_integration(metric, uid)
 
-                    # Get last run time
-                    last_run = db.get_last_run(uid, metric)
-                    logger.info(f"Last run for {uid}/{metric}: {last_run}")
+                    # Get last run time or use provided start_date
+                    if start_date:
+                        last_run = start_date  # Pass as-is, will be parsed as YYYY-MM-DD
+                        logger.info(f"Using provided start_date: {start_date}")
+                    else:
+                        last_run = db.get_last_run(uid, metric)
+                        logger.info(f"Last run for {uid}/{metric}: {last_run}")
 
                     # Fetch and store data
-                    data_points = integration.fetch_data(last_run)
+                    data_points = integration.fetch_data(last_run, end_date)
                     logger.info(f"Fetched {len(data_points)} data points")
+                    
+                    # Log actual values
+                    for point in data_points:
+                        logger.info(f"{uid}/{metric} - {point['date']}: {point['value']}")
 
                     if data_points:
                         db.store_metrics(uid, metric, data_points)
-                        db.update_last_run(uid, metric)
+                        # Only update last_run if not using manual date override
+                        if not start_date:
+                            db.update_last_run(uid, metric)
                         results.append({
                             'user_id': uid,
                             'metric': metric,
