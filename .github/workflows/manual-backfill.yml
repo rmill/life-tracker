@@ -37,29 +37,27 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Build payload
-        id: payload
-        run: |
-          PAYLOAD="{}"
-          if [ -n "${{ inputs.metric }}" ]; then
-            PAYLOAD=$(echo $PAYLOAD | jq --arg m "${{ inputs.metric }}" '. + {metric: $m}')
-          fi
-          if [ -n "${{ inputs.user_id }}" ]; then
-            PAYLOAD=$(echo $PAYLOAD | jq --arg u "${{ inputs.user_id }}" '. + {user_id: $u}')
-          fi
-          if [ -n "${{ inputs.start_date }}" ]; then
-            PAYLOAD=$(echo $PAYLOAD | jq --arg s "${{ inputs.start_date }}" '. + {start_date: $s}')
-          fi
-          if [ -n "${{ inputs.end_date }}" ]; then
-            PAYLOAD=$(echo $PAYLOAD | jq --arg e "${{ inputs.end_date }}" '. + {end_date: $e}')
-          fi
-          echo "payload=$PAYLOAD" >> $GITHUB_OUTPUT
-
       - name: Invoke Lambda
         run: |
+          PAYLOAD='{}'
+          if [ -n "${{ inputs.metric }}" ]; then
+            PAYLOAD=$(echo $PAYLOAD | jq -c --arg m "${{ inputs.metric }}" '. + {metric: $m}')
+          fi
+          if [ -n "${{ inputs.user_id }}" ]; then
+            PAYLOAD=$(echo $PAYLOAD | jq -c --arg u "${{ inputs.user_id }}" '. + {user_id: $u}')
+          fi
+          if [ -n "${{ inputs.start_date }}" ]; then
+            PAYLOAD=$(echo $PAYLOAD | jq -c --arg s "${{ inputs.start_date }}" '. + {start_date: $s}')
+          fi
+          if [ -n "${{ inputs.end_date }}" ]; then
+            PAYLOAD=$(echo $PAYLOAD | jq -c --arg e "${{ inputs.end_date }}" '. + {end_date: $e}')
+          fi
+          
+          echo "Invoking Lambda with payload: $PAYLOAD"
+          
           aws lambda invoke \
             --function-name life-stats \
-            --payload '${{ steps.payload.outputs.payload }}' \
+            --payload "$PAYLOAD" \
             --cli-binary-format raw-in-base64-out \
             response.json
           
