@@ -2,6 +2,8 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 from decimal import Decimal
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from integrations.base import BaseIntegration
 from utils.logger import setup_logger
 
@@ -17,6 +19,17 @@ class OpenMeteoWeatherIntegration(BaseIntegration):
 
     def __init__(self, user_id: str):
         super().__init__(user_id)
+        # Configure session with retry logic
+        self.session = requests.Session()
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET"]
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
 
     def _to_decimal(self, value):
         """Convert float/int to Decimal for DynamoDB, handle None."""
@@ -53,7 +66,7 @@ class OpenMeteoWeatherIntegration(BaseIntegration):
                 'timezone': 'America/Edmonton'
             }
 
-            response = requests.get(url, params=params, timeout=30)
+            response = self.session.get(url, params=params, timeout=30)
             response.raise_for_status()
             data = response.json()
 
