@@ -37,6 +37,14 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Display run parameters
+        run: |
+          echo "### Backfill Parameters" >> $GITHUB_STEP_SUMMARY
+          echo "- **User ID**: ${{ inputs.user_id || 'all users' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Metric**: ${{ inputs.metric || 'all metrics' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Start Date**: ${{ inputs.start_date || 'from last run' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **End Date**: ${{ inputs.end_date || 'now' }}" >> $GITHUB_STEP_SUMMARY
+
       - name: Invoke Lambda
         run: |
           PAYLOAD='{}'
