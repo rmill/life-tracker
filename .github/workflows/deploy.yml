@@ -66,6 +66,10 @@ jobs:
         run: |
           pytest tests/test_functional.py tests/test_weather_functional.py -v
 
+      - name: Run integration tests (pre-deployment)
+        run: |
+          pytest tests/test_weather_integration.py -v
+
   test-external-api:
     name: Test External API Integrations
     runs-on: ubuntu-latest
