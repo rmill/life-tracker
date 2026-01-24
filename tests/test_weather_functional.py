@@ -1,6 +1,7 @@
 """Functional tests for Open-Meteo weather integration."""
 import pytest
 from datetime import datetime, timezone, timedelta
+from decimal import Decimal
 from integrations.open_meteo import OpenMeteoWeatherIntegration
 
 
@@ -44,13 +45,13 @@ def test_weather_fetch_data_structure():
     assert 'sunshine_duration' in value
     
     # Check data types
-    assert isinstance(value['temp_max'], (int, float))
-    assert isinstance(value['temp_min'], (int, float))
-    assert isinstance(value['humidity_mean'], (int, float))
-    assert isinstance(value['pressure_mean'], (int, float))
-    assert isinstance(value['precipitation'], (int, float))
-    assert isinstance(value['wind_max'], (int, float))
-    assert isinstance(value['sunshine_duration'], (int, float))
+    assert isinstance(value['temp_max'], (int, float, Decimal))
+    assert isinstance(value['temp_min'], (int, float, Decimal))
+    assert isinstance(value['humidity_mean'], (int, float, Decimal))
+    assert isinstance(value['pressure_mean'], (int, float, Decimal))
+    assert isinstance(value['precipitation'], (int, float, Decimal))
+    assert isinstance(value['wind_max'], (int, float, Decimal))
+    assert isinstance(value['sunshine_duration'], (int, float, Decimal))
 
 
 def test_weather_data_sanity_checks():
@@ -68,25 +69,33 @@ def test_weather_data_sanity_checks():
     assert len(data_points) == 1
     value = data_points[0]['value']
     
-    # Calgary temperature ranges (reasonable bounds)
-    assert -50 <= value['temp_max'] <= 40  # °C
-    assert -50 <= value['temp_min'] <= 40
-    assert value['temp_min'] <= value['temp_max']
+    # Calgary temperature ranges (reasonable bounds) - convert Decimal to float for comparison
+    temp_max = float(value['temp_max'])
+    temp_min = float(value['temp_min'])
+    humidity = float(value['humidity_mean'])
+    pressure = float(value['pressure_mean'])
+    precipitation = float(value['precipitation'])
+    wind = float(value['wind_max'])
+    sunshine = float(value['sunshine_duration'])
+    
+    assert -50 <= temp_max <= 40  # °C
+    assert -50 <= temp_min <= 40
+    assert temp_min <= temp_max
     
     # Humidity 0-100%
-    assert 0 <= value['humidity_mean'] <= 100
+    assert 0 <= humidity <= 100
     
     # Pressure reasonable range
-    assert 900 <= value['pressure_mean'] <= 1100  # hPa
+    assert 900 <= pressure <= 1100  # hPa
     
     # Precipitation non-negative
-    assert value['precipitation'] >= 0
+    assert precipitation >= 0
     
     # Wind speed non-negative
-    assert value['wind_max'] >= 0
+    assert wind >= 0
     
     # Sunshine duration 0-86400 seconds (24 hours)
-    assert 0 <= value['sunshine_duration'] <= 86400
+    assert 0 <= sunshine <= 86400
 
 
 def test_weather_date_range():
