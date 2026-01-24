@@ -61,7 +61,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     # Fetch and store data
                     data_points = integration.fetch_data(last_run, end_date)
                     logger.info(f"Fetched {len(data_points)} data points")
-                    
+
                     # Log actual values
                     for point in data_points:
                         logger.info(f"{uid}/{metric} - {point['date']}: {point['value']}")
