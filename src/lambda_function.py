@@ -48,15 +48,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     - user_id: Optional[str] - Specific user. If not provided, runs for all users.
     - start_date: Optional[str] - Start date (YYYY-MM-DD). Overrides last_run logic.
     - end_date: Optional[str] - End date (YYYY-MM-DD). Defaults to now.
+    - source: Optional[str] - Source of invocation (e.g., 'manual', 'eventbridge').
     """
     metric_name = event.get('metric')
     user_id = event.get('user_id')
     start_date = event.get('start_date')
     end_date = event.get('end_date')
+    source = event.get('source', 'eventbridge')
 
     # Determine run type
-    is_manual = bool(start_date or end_date)
-    run_type = "MANUAL" if is_manual else "AUTOMATIC"
+    run_type = "MANUAL" if source == 'manual' else "AUTOMATIC"
 
     # Log run parameters
     logger.info(f"=== Lambda Invocation ({run_type}) ===")

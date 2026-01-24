@@ -47,7 +47,7 @@ jobs:
 
       - name: Invoke Lambda
         run: |
-          PAYLOAD='{}'
+          PAYLOAD='{"source":"manual"}'
           if [ -n "${{ inputs.metric }}" ]; then
             PAYLOAD=$(echo $PAYLOAD | jq -c --arg m "${{ inputs.metric }}" '. + {metric: $m}')
           fi
