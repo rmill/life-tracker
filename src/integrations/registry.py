@@ -1,6 +1,7 @@
 from typing import Dict, Type, List
 from integrations.base import BaseIntegration
 from integrations.google_fit import GoogleFitStepsIntegration
+from integrations.open_meteo import OpenMeteoWeatherIntegration
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -11,6 +12,7 @@ class IntegrationRegistry:
 
     _integrations: Dict[str, Type[BaseIntegration]] = {
         'steps': GoogleFitStepsIntegration,
+        'weather': OpenMeteoWeatherIntegration,
     }
 
     def get_integration(self, metric_name: str, user_id: str) -> BaseIntegration:
