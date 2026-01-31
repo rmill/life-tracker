@@ -2,8 +2,6 @@
 Functional tests for Life Stats Lambda function.
 Tests against real AWS resources (DynamoDB, SSM).
 """
-from lambda_function import handler
-import boto3
 import os
 import sys
 import json
@@ -18,6 +16,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 os.environ['METRICS_TABLE'] = 'life-stats-metrics-test'
 os.environ['RUNS_TABLE'] = 'life-stats-runs-test'
 os.environ['AWS_DEFAULT_REGION'] = os.environ.get('AWS_REGION', 'us-west-2')
+
+import boto3
+from lambda_function import handler
 
 
 class MockContext:

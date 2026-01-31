@@ -9,3 +9,5 @@ exclude =
     dist,
     .terraform
 ignore = E203, W503
+per-file-ignores =
+    tests/*:E402

@@ -1,4 +1,10 @@
 """Functional tests for Open-Meteo weather integration."""
+import sys
+from pathlib import Path
+
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+
 import pytest
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
