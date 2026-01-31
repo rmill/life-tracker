@@ -20,7 +20,7 @@ gh auth switch -u rmill
 
 ## Pre-Push Checklist
 
-**MANDATORY: Before every `git push`, run linting and tests:**
+**MANDATORY: Before every `git push`, run linting and ALL tests:**
 
 ### 1. Linting (must all pass)
 ```bash
@@ -33,19 +33,22 @@ flake8 src/ --count --max-complexity=10 --max-line-length=127 --statistics
 flake8 src/ tests/
 ```
 
-### 2. Tests (must pass)
+### 2. All Tests (must pass)
 ```bash
-# Run unit/functional tests (same as CI - no external API calls)
-pytest tests/test_functional.py tests/test_weather_unit.py -v
+# Run ALL tests including integration tests with real APIs
+SKIP_LIVE_API_TESTS=false SKIP_INTEGRATION_TESTS=false pytest tests/ -v
 ```
 
 All commands must pass (exit code 0) before pushing.
 
 ## Test Structure
 
-- **Unit tests** (`test_*_unit.py`): Mocked, fast, run in CI
-- **Functional tests** (`test_functional.py`): Real AWS resources (DynamoDB test tables), run in CI
-- **Integration tests** (`test_*_integration*.py`): Real external APIs, skipped in CI by default
+- **Unit tests** (`test_*_unit.py`): Mocked, fast (~1s)
+- **Functional tests** (`test_functional.py`): Real AWS test resources (~7s)
+- **External API tests** (`test_*_external_api.py`): Real API calls (~10s)
+- **Integration tests** (`test_*_integration*.py`): Full end-to-end (~12s)
+
+**Total: ~30 seconds for all 42 tests**
 
 ## Repository Details
 
