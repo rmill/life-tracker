@@ -91,42 +91,42 @@ class ClickUpTasksIntegration(BaseIntegration):
         """Split task into separate entries if it spans multiple days."""
         start_ms = int(task['start_date'])
         end_ms = int(task['date_done'])
-        
+
         start_dt = datetime.fromtimestamp(start_ms / 1000, tz=timezone.utc)
         end_dt = datetime.fromtimestamp(end_ms / 1000, tz=timezone.utc)
-        
+
         # Check if same day
         if start_dt.date() == end_dt.date():
             return [task]
-        
+
         # Split across days
         split_tasks = []
         current_start = start_dt
-        
+
         while current_start.date() <= end_dt.date():
             day_end = current_start.replace(hour=23, minute=59, second=59, microsecond=999999)
-            
+
             if day_end > end_dt:
                 day_end = end_dt
-            
+
             split_task = task.copy()
             split_task['start_date'] = str(int(current_start.timestamp() * 1000))
             split_task['date_done'] = str(int(day_end.timestamp() * 1000))
             split_tasks.append(split_task)
-            
+
             # Move to next day
             current_start = (current_start + timedelta(days=1)).replace(
                 hour=0, minute=0, second=0, microsecond=0
             )
-        
+
         return split_tasks
 
     def fetch_data(self, since: Optional[str] = None, until: Optional[str] = None) -> List[Dict[str, Any]]:
         """Fetch completed tasks from ClickUp and group by task type and date."""
         start_date, end_date = self._get_date_range(since, until)
-        
+
         logger.info(f"Fetching ClickUp tasks for {self.user_id} from {start_date} to {end_date}")
-        
+
         try:
             # Fetch tasks from list with status filter
             params = {
@@ -134,48 +134,48 @@ class ClickUpTasksIntegration(BaseIntegration):
                 "include_closed": "true",
                 "statuses[]": "done"
             }
-            
+
             response = self._make_request(f"/list/{self.list_id}/task", params)
             tasks = response.get('tasks', [])
-            
+
             logger.info(f"Fetched {len(tasks)} completed tasks from ClickUp")
-            
+
             # Group by task type and date
             grouped_data = {}
-            
+
             for task in tasks:
                 # Skip tasks without required fields
                 if not task.get('start_date') or not task.get('date_done'):
                     logger.debug(f"Skipping task {task.get('id')} - missing start/end time")
                     continue
-                
+
                 # Split task if it spans multiple days
                 split_tasks = self._split_task_by_day(task)
-                
+
                 for split_task in split_tasks:
                     start_ms = int(split_task['start_date'])
                     end_ms = int(split_task['date_done'])
-                    
+
                     task_date = datetime.fromtimestamp(start_ms / 1000, tz=timezone.utc)
-                    
+
                     # Filter by date range
                     if task_date < start_date or task_date > end_date:
                         continue
-                    
+
                     date_str = task_date.strftime('%Y-%m-%d')
-                    
+
                     # Get task type from custom_item_id
                     custom_item_id = split_task.get('custom_item_id')
                     task_type = self.custom_types.get(custom_item_id, 'unknown')
-                    
+
                     tags = [tag['name'] for tag in split_task.get('tags', [])]
-                    
+
                     # Calculate duration
                     duration = self._calculate_duration_hours(start_ms, end_ms)
-                    
+
                     # Create key for grouping
                     key = (date_str, task_type)
-                    
+
                     if key not in grouped_data:
                         grouped_data[key] = {
                             'date': date_str,
@@ -183,10 +183,10 @@ class ClickUpTasksIntegration(BaseIntegration):
                             'total_hours': 0,
                             'tags': set()
                         }
-                    
+
                     grouped_data[key]['total_hours'] += duration
                     grouped_data[key]['tags'].update(tags)
-            
+
             # Convert to output format
             data_points = []
             for (date_str, task_type), data in grouped_data.items():
@@ -200,10 +200,10 @@ class ClickUpTasksIntegration(BaseIntegration):
                     'timestamp': datetime.now(timezone.utc).isoformat()
                 })
                 logger.debug(f"Task type '{task_type}' on {date_str}: {data['total_hours']} hours")
-            
+
             logger.info(f"Successfully processed {len(data_points)} task type/date combinations")
             return data_points
-            
+
         except Exception as e:
             logger.error(f"Error fetching ClickUp data: {e}", exc_info=True)
             raise

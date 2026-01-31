@@ -29,7 +29,7 @@ def _process_metric(uid: str, metric: str, integration, db: MetricsDB, start_dat
 
     # Check if data points have dynamic metric_type (e.g., ClickUp tasks)
     has_dynamic_types = any('metric_type' in point for point in data_points)
-    
+
     if has_dynamic_types:
         # Group by metric_type and store separately
         grouped = {}
@@ -38,33 +38,33 @@ def _process_metric(uid: str, metric: str, integration, db: MetricsDB, start_dat
             if mt not in grouped:
                 grouped[mt] = []
             grouped[mt].append(point)
-        
+
         total_stored = 0
         for metric_type, points in grouped.items():
             # Log actual values
             for point in points:
                 logger.info(f"{uid}/{metric_type} - {point['date']}: {point['value']}")
-            
+
             db.store_metrics(uid, metric_type, points)
             total_stored += len(points)
             logger.info(f"Successfully stored {len(points)} points for {uid}/{metric_type}")
-        
+
         # Only update last_run if not using manual date override
         if not start_date:
             db.update_last_run(uid, metric)
-        
+
         return {'user_id': uid, 'metric': metric, 'count': total_stored, 'status': 'success'}
     else:
         # Standard single metric type
         for point in data_points:
             logger.info(f"{uid}/{metric} - {point['date']}: {point['value']}")
-        
+
         db.store_metrics(uid, metric, data_points)
-        
+
         # Only update last_run if not using manual date override
         if not start_date:
             db.update_last_run(uid, metric)
-        
+
         logger.info(f"Successfully stored {len(data_points)} points for {uid}/{metric}")
         return {'user_id': uid, 'metric': metric, 'count': len(data_points), 'status': 'success'}
 
