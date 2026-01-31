@@ -20,8 +20,9 @@ gh auth switch -u rmill
 
 ## Pre-Push Checklist
 
-**MANDATORY: Before every `git push`, run linting:**
+**MANDATORY: Before every `git push`, run linting and tests:**
 
+### 1. Linting (must all pass)
 ```bash
 cd ~/AI/poc/life-stats
 source venv/bin/activate
@@ -30,6 +31,12 @@ source venv/bin/activate
 flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
 flake8 src/ --count --max-complexity=10 --max-line-length=127 --statistics
 flake8 src/ tests/
+```
+
+### 2. Tests (must pass)
+```bash
+# Run functional tests (same as CI)
+pytest tests/test_functional.py tests/test_weather_functional.py -v
 ```
 
 All commands must pass (exit code 0) before pushing.
