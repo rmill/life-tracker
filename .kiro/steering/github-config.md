@@ -35,11 +35,17 @@ flake8 src/ tests/
 
 ### 2. Tests (must pass)
 ```bash
-# Run functional tests (same as CI)
-pytest tests/test_functional.py tests/test_weather_functional.py -v
+# Run unit/functional tests (same as CI - no external API calls)
+pytest tests/test_functional.py tests/test_weather_unit.py -v
 ```
 
 All commands must pass (exit code 0) before pushing.
+
+## Test Structure
+
+- **Unit tests** (`test_*_unit.py`): Mocked, fast, run in CI
+- **Functional tests** (`test_functional.py`): Real AWS resources (DynamoDB test tables), run in CI
+- **Integration tests** (`test_*_integration*.py`): Real external APIs, skipped in CI by default
 
 ## Repository Details
 
