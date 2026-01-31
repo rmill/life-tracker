@@ -62,9 +62,9 @@ jobs:
           pip install -r requirements-lambda.txt
           pip install -r requirements-test.txt
 
-      - name: Run functional tests
+      - name: Run unit and functional tests
         run: |
-          pytest tests/test_functional.py tests/test_weather_functional.py -v
+          pytest tests/ -v
 
       - name: Run integration tests (pre-deployment)
         run: |
