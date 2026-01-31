@@ -131,7 +131,9 @@ def test_clickup_fetch_tasks(ssm_client, clickup_credentials_exist):
         assert isinstance(point['value'], dict)
         assert 'hours' in point['value']
         assert 'tags' in point['value']
-        assert isinstance(point['value']['hours'], (int, float))
+        # Hours should be Decimal for DynamoDB compatibility
+        from decimal import Decimal
+        assert isinstance(point['value']['hours'], (int, float, Decimal))
         assert isinstance(point['value']['tags'], list)
 
         # Verify metric_type is valid
