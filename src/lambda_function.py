@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Any
+from typing import Dict, Any, List
 from integrations.registry import IntegrationRegistry
 from utils.db import MetricsDB
 from utils.logger import setup_logger
@@ -7,19 +7,53 @@ from utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 
+def _store_dynamic_metrics(uid: str, metric: str, data_points: List[Dict], db: MetricsDB, start_date: str) -> Dict[str, Any]:
+    """Store metrics with dynamic types (e.g., ClickUp tasks)."""
+    grouped = {}
+    for point in data_points:
+        mt = point.get('metric_type', metric)
+        if mt not in grouped:
+            grouped[mt] = []
+        grouped[mt].append(point)
+
+    total_stored = 0
+    for metric_type, points in grouped.items():
+        for point in points:
+            logger.info(f"{uid}/{metric_type} - {point['date']}: {point['value']}")
+
+        db.store_metrics(uid, metric_type, points)
+        total_stored += len(points)
+        logger.info(f"Successfully stored {len(points)} points for {uid}/{metric_type}")
+
+    if not start_date:
+        db.update_last_run(uid, metric)
+
+    return {'user_id': uid, 'metric': metric, 'count': total_stored, 'status': 'success'}
+
+
+def _store_single_metric(uid: str, metric: str, data_points: List[Dict], db: MetricsDB, start_date: str) -> Dict[str, Any]:
+    """Store metrics with single type."""
+    for point in data_points:
+        logger.info(f"{uid}/{metric} - {point['date']}: {point['value']}")
+
+    db.store_metrics(uid, metric, data_points)
+
+    if not start_date:
+        db.update_last_run(uid, metric)
+
+    logger.info(f"Successfully stored {len(data_points)} points for {uid}/{metric}")
+    return {'user_id': uid, 'metric': metric, 'count': len(data_points), 'status': 'success'}
+
+
 def _process_metric(uid: str, metric: str, integration, db: MetricsDB, start_date: str, end_date: str) -> Dict[str, Any]:
     """Process a single metric for a user."""
     logger.info(f"Processing metric '{metric}' for user '{uid}'")
 
     # Get last run time or use provided start_date
-    if start_date:
-        last_run = start_date
-        logger.info(f"Using provided start_date: {start_date}")
-    else:
-        last_run = db.get_last_run(uid, metric)
-        logger.info(f"Last run for {uid}/{metric}: {last_run}")
+    last_run = start_date if start_date else db.get_last_run(uid, metric)
+    logger.info(f"Using {'provided start_date' if start_date else 'last run'}: {last_run}")
 
-    # Fetch and store data
+    # Fetch data
     data_points = integration.fetch_data(last_run, end_date)
     logger.info(f"Fetched {len(data_points)} data points")
 
@@ -27,46 +61,13 @@ def _process_metric(uid: str, metric: str, integration, db: MetricsDB, start_dat
         logger.info(f"No new data for {uid}/{metric}")
         return {'user_id': uid, 'metric': metric, 'count': 0, 'status': 'no_data'}
 
-    # Check if data points have dynamic metric_type (e.g., ClickUp tasks)
+    # Check if data points have dynamic metric_type
     has_dynamic_types = any('metric_type' in point for point in data_points)
 
     if has_dynamic_types:
-        # Group by metric_type and store separately
-        grouped = {}
-        for point in data_points:
-            mt = point.get('metric_type', metric)
-            if mt not in grouped:
-                grouped[mt] = []
-            grouped[mt].append(point)
-
-        total_stored = 0
-        for metric_type, points in grouped.items():
-            # Log actual values
-            for point in points:
-                logger.info(f"{uid}/{metric_type} - {point['date']}: {point['value']}")
-
-            db.store_metrics(uid, metric_type, points)
-            total_stored += len(points)
-            logger.info(f"Successfully stored {len(points)} points for {uid}/{metric_type}")
-
-        # Only update last_run if not using manual date override
-        if not start_date:
-            db.update_last_run(uid, metric)
-
-        return {'user_id': uid, 'metric': metric, 'count': total_stored, 'status': 'success'}
+        return _store_dynamic_metrics(uid, metric, data_points, db, start_date)
     else:
-        # Standard single metric type
-        for point in data_points:
-            logger.info(f"{uid}/{metric} - {point['date']}: {point['value']}")
-
-        db.store_metrics(uid, metric, data_points)
-
-        # Only update last_run if not using manual date override
-        if not start_date:
-            db.update_last_run(uid, metric)
-
-        logger.info(f"Successfully stored {len(data_points)} points for {uid}/{metric}")
-        return {'user_id': uid, 'metric': metric, 'count': len(data_points), 'status': 'success'}
+        return _store_single_metric(uid, metric, data_points, db, start_date)
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
