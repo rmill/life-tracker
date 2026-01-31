@@ -25,10 +25,14 @@ gh auth switch -u rmill
 ```bash
 cd ~/AI/poc/life-stats
 source venv/bin/activate
+
+# Run all linting checks (same as CI)
+flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
+flake8 src/ --count --max-complexity=10 --max-line-length=127 --statistics
 flake8 src/ tests/
 ```
 
-If linting fails, fix issues before pushing.
+All commands must pass (exit code 0) before pushing.
 
 ## Repository Details
 
