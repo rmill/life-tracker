@@ -1,6 +1,7 @@
 """External API tests for Open-Meteo weather integration."""
 # -*- coding: utf-8 -*-
 import requests
+import pytest
 from datetime import datetime, timedelta
 
 
@@ -17,13 +18,16 @@ def test_open_meteo_api_connectivity():
         'daily': 'temperature_2m_max'
     }
 
-    response = requests.get(url, params=params, timeout=10)
-    assert response.status_code == 200
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        assert response.status_code == 200
 
-    data = response.json()
-    assert 'latitude' in data
-    assert 'longitude' in data
-    assert 'daily' in data
+        data = response.json()
+        assert 'latitude' in data
+        assert 'longitude' in data
+        assert 'daily' in data
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+        pytest.skip(f"Open-Meteo API unavailable (network timeout): {e}")
 
 
 def test_open_meteo_api_response_structure():
@@ -49,26 +53,29 @@ def test_open_meteo_api_response_structure():
         'timezone': 'America/Edmonton'
     }
 
-    response = requests.get(url, params=params, timeout=10)
-    assert response.status_code == 200
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        assert response.status_code == 200
 
-    data = response.json()
+        data = response.json()
 
-    # Check top-level structure
-    assert 'latitude' in data
-    assert 'longitude' in data
-    assert 'timezone' in data
-    assert 'daily' in data
-    assert 'daily_units' in data
+        # Check top-level structure
+        assert 'latitude' in data
+        assert 'longitude' in data
+        assert 'timezone' in data
+        assert 'daily' in data
+        assert 'daily_units' in data
 
-    # Check daily data
-    daily = data['daily']
-    assert 'time' in daily
-    assert 'temperature_2m_max' in daily
-    assert 'temperature_2m_min' in daily
-    assert 'relative_humidity_2m_mean' in daily
-    assert 'surface_pressure_mean' in daily
-    assert 'precipitation_sum' in daily
+        # Check daily data
+        daily = data['daily']
+        assert 'time' in daily
+        assert 'temperature_2m_max' in daily
+        assert 'temperature_2m_min' in daily
+        assert 'relative_humidity_2m_mean' in daily
+        assert 'surface_pressure_mean' in daily
+        assert 'precipitation_sum' in daily
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+        pytest.skip(f"Open-Meteo API unavailable (network timeout): {e}")
     assert 'wind_speed_10m_max' in daily
     assert 'sunshine_duration' in daily
 
@@ -91,20 +98,23 @@ def test_open_meteo_calgary_coordinates():
         'timezone': 'America/Edmonton'
     }
 
-    response = requests.get(url, params=params, timeout=10)
-    assert response.status_code == 200
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        assert response.status_code == 200
 
-    data = response.json()
+        data = response.json()
 
-    # Verify coordinates are close to requested
-    assert abs(data['latitude'] - 51.05306) < 0.1
-    assert abs(data['longitude'] - (-114.07139)) < 0.1
+        # Verify coordinates are close to requested
+        assert abs(data['latitude'] - 51.05306) < 0.1
+        assert abs(data['longitude'] - (-114.07139)) < 0.1
 
-    # Verify timezone
-    assert data['timezone'] == 'America/Edmonton'
+        # Verify timezone
+        assert data['timezone'] == 'America/Edmonton'
 
-    # Verify 3 days of data
-    assert len(data['daily']['time']) == 3
+        # Verify 3 days of data
+        assert len(data['daily']['time']) == 3
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+        pytest.skip(f"Open-Meteo API unavailable (network timeout): {e}")
 
 
 def test_open_meteo_data_quality():
